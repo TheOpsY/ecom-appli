@@ -1,0 +1,80 @@
+- name: 'Auto installation du Site Web de Ecommerce'
+  hosts: target1
+  become: true
+  tasks:
+   - name: Installation de firewalld
+     yum:
+       name: firewalld
+       state: latest
+   - name: Demarrage service Firewalld
+     service:
+       name: firewalld
+       state: started
+       enabled: yes
+   - name: Installation de mariadb
+     yum:
+       name: mariadb-server
+       state: latest
+   - name: Demarrage de Mariadb
+     service:
+       name: mariadb
+       state: started
+       enabled: yes
+   - name: Installation du serveur web et prerequis
+     yum:
+       name:
+         - httpd
+         - php
+         - php-mysql
+         - MySQL-python
+         - git
+       state: latest
+   - name: Demarrage httpd
+     service:
+       name: httpd
+       state: started
+       enabled: yes
+   - name: Configuration du Parefeu
+     firewalld:  
+       port: "{{ item }}"
+       immediate: yes
+       permanent: yes
+       state: enabled
+     loop:
+        - 2212/tcp
+        - 80/tcp
+        - 3306/tcp
+   - name: Creation de la base de donne 'ecomdb'
+     mysql_db:
+      name: ecomdb
+      state: present
+   - name: Creation de l'utilisateur ecomuser avec les droits GRANTS
+     mysql_user:
+      name: ecomuser
+      password: ecomps3c!
+      priv: 'ecomdb.*:ALL,GRANT'
+      host: localhost
+      state: present
+   - name: Copie du dump de la database
+     copy:
+      src: db-load-script.sql
+      dest: /home/admin/
+   - name: Import des donnees
+     mysql_db:
+      state: import
+      name: all
+      target: /home/admin/db-load-script.sql
+   - name: Change index.html en index.php dans le fichier de configuration httpd
+     command: /usr/bin/sed -i 's/index.html/index.php/g' /etc/httpd/conf/httpd.conf
+   - name: Change index.html en index.php dans le fichier de configuration httpd
+     command: /usr/bin/sed -i 's/index.html/index.php/g' /etc/httpd/conf/httpd.conf
+   - name: Clone du repo git
+     ansible.builtin.git:
+      repo: https://github.com/kodekloudhub/learning-app-ecommerce.git
+      dest: /var/www/html/
+   - name: mise à jour chaine de connexion à la BD
+     command: /usr/bin/sed -i 's/172.20.1.101/localhost/g' /var/www/html/index.php
+   - name: mise à jour MDP BD dans la chaine de connexion
+     command: /usr/bin/sed -i 's/ecompassword/ecomps3c!/g' /var/www/html/index.php
+
+
